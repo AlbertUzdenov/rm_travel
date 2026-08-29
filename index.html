@@ -890,6 +890,10 @@ const Deals=({deals,clients,services,reload,isMobile})=>{
 
   const saveDeal=async deal=>{
     const row=toSnake({...deal});
+    // Пустые даты -> null (Postgres не принимает пустую строку для типа date)
+    if(!row.start_date) row.start_date=null;
+    if(!row.end_date) row.end_date=null;
+    if(!row.cancel_deadline) row.cancel_deadline=null;
     delete row.deal_number; // номер управляется базой, не перезаписываем
     if(editing){
       await sb.from('deals').update(row).eq('id',deal.id);
