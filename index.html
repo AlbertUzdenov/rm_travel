@@ -748,7 +748,7 @@ const FileUpload=({files,onChange})=>{
 
 // ============ DEAL FORM ============
 const DealForm=({deal,clients,services,onSave,onClose,addClient,addService,isMobile})=>{
-  const initial=deal||{id:uid(),date:todayISO(),startDate:'',endDate:'',clientId:null,serviceId:null,category:'Авиабилеты',net:0,gross:0,currency:'RUB',rate:1,rateSource:'rub',rateWithMarkup:1,status:'В работе',note:'',files:[],history:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+  const initial=deal||{id:uid(),date:todayISO(),startDate:'',endDate:'',cancelDeadline:'',clientId:null,serviceId:null,category:'Авиабилеты',net:0,gross:0,currency:'RUB',rate:1,rateSource:'rub',rateWithMarkup:1,status:'В работе',note:'',files:[],history:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
   const [d,setD]=useState(initial);
   const [saving,setSaving]=useState(false);
   const [errors,setErrors]=useState({});
@@ -820,6 +820,7 @@ const DealForm=({deal,clients,services,onSave,onClose,addClient,addService,isMob
           </Field>
           <Field label="Дата старта"><input type="date" value={d.startDate||''} onChange={e=>setField('startDate',e.target.value)} style={inp}/></Field>
           <Field label="Дата окончания"><input type="date" value={d.endDate||''} onChange={e=>setField('endDate',e.target.value)} style={inp}/></Field>
+          <Field label="Дедлайн по отмене без штрафа" full hint="до какой даты можно отменить бесплатно"><input type="date" value={d.cancelDeadline||''} onChange={e=>setField('cancelDeadline',e.target.value)} style={inp}/></Field>
           <Field label="Валюта">
             <select value={d.currency} onChange={e=>setField('currency',e.target.value)} style={inp}>{CURRENCIES.map(c=><option key={c.code} value={c.code}>{c.code} — {c.label}</option>)}</select>
           </Field>
@@ -1067,6 +1068,7 @@ const Deals=({deals,clients,services,reload,isMobile})=>{
                   ['Автор', <span style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:22,height:22,borderRadius:'50%',background:BRAND_LIGHT,color:BRAND,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700}}>{authorLabel[0]?.toUpperCase()||'?'}</div>{authorLabel}</span>],
                   ['Дата старта', d.startDate?new Date(d.startDate).toLocaleDateString('ru-RU'):'—'],
                   ['Дата окончания', d.endDate?new Date(d.endDate).toLocaleDateString('ru-RU'):'—'],
+                  ['Дедлайн отмены без штрафа', d.cancelDeadline?new Date(d.cancelDeadline).toLocaleDateString('ru-RU'):'—'],
                   ['Валюта', d.currency],
                   ['Курс (с наценкой)', d.currency==='RUB'?'—':(d.rateWithMarkup||1).toFixed(4)],
                   ['Нетто', d.net?(Number(d.net).toLocaleString('ru-RU')+' '+(CURRENCIES.find(c=>c.code===d.currency)?.symbol||'')):'—'],
@@ -1777,7 +1779,7 @@ function App(){
       sb.from('services').select('*').order('created_at',{ascending:false}),
     ]);
     // Convert snake_case to camelCase
-    setDeals((d||[]).map(r=>({...r,dealNumber:r.deal_number,startDate:r.start_date,endDate:r.end_date,clientId:r.client_id,serviceId:r.service_id,rateSource:r.rate_source,rateWithMarkup:r.rate_with_markup,grossRub:r.gross_rub,netRub:r.net_rub,commissionRub:r.commission_rub,createdAt:r.created_at,updatedAt:r.updated_at,createdBy:r.created_by,createdByEmail:r.created_by_email,createdByName:r.created_by_name})));
+    setDeals((d||[]).map(r=>({...r,dealNumber:r.deal_number,startDate:r.start_date,endDate:r.end_date,cancelDeadline:r.cancel_deadline,clientId:r.client_id,serviceId:r.service_id,rateSource:r.rate_source,rateWithMarkup:r.rate_with_markup,grossRub:r.gross_rub,netRub:r.net_rub,commissionRub:r.commission_rub,createdAt:r.created_at,updatedAt:r.updated_at,createdBy:r.created_by,createdByEmail:r.created_by_email,createdByName:r.created_by_name})));
     setClients((c||[]).map(r=>({...r,firstName:r.first_name,lastName:r.last_name,createdAt:r.created_at})));
     setServices((s||[]).map(r=>({...r,createdAt:r.created_at})));
     setLoading(false);
