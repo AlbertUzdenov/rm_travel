@@ -181,7 +181,8 @@ const STATUSES=[
   {id:'Оплачено поставщику',color:'#1565C0',bg:'#E3F2FD'},
   {id:'Ожидание',color:'#1976D2',bg:'#E8EAF6'},
   {id:'Отменено',color:'#757575',bg:'#EEEEEE'},
-  {id:'Возврат',color:'#D32F2F',bg:'#FFEBEE'}
+  {id:'Возврат',color:'#D32F2F',bg:'#FFEBEE'},
+  {id:'Завершен',color:'#546E7A',bg:'#ECEFF1'}
 ];
 const PAID_CLIENT='Оплачено клиентом';
 const isPaidClient=d=>d&&d.status===PAID_CLIENT;
@@ -991,7 +992,7 @@ const Deals=({deals,clients,services,reload,isMobile})=>{
                   const authorLabel=d.createdByName||d.createdByEmail||'—';
                   const authorShort=authorLabel.length>16?authorLabel.slice(0,14)+'…':authorLabel;
                   return (
-                    <tr key={d.id} style={{borderBottom:'1px solid #f0f0f0',opacity:deleting===d.id?0.3:paid?1:0.75,cursor:'pointer',background:paid?'#EEEEEE':'transparent'}}
+                    <tr key={d.id} style={{borderBottom:'2px solid #d5dae0',opacity:deleting===d.id?0.3:paid?1:0.75,cursor:'pointer',background:d.status==='Завершен'?'#EEEEEE':'transparent'}}
                       onClick={()=>setViewDeal(d)}>
                       <td style={{padding:'10px',fontWeight:700,color:BRAND,fontSize:12,whiteSpace:'nowrap'}}>{d.dealNumber?'№'+d.dealNumber:'—'}</td>
                       <td style={{padding:'10px',color:'#666',whiteSpace:'nowrap',fontSize:12}}>{new Date(d.date).toLocaleDateString('ru-RU')}</td>
