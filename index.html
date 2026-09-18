@@ -172,7 +172,7 @@ const sb = createSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
 const BRAND='#5680BF', BRAND_DARK='#3D5F94', BRAND_LIGHT='#E8EFF9', BG='#F7F7F7';
 const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const MONTHS_SHORT=['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-const CATEGORIES=['Авиабилеты','Отели','Туры','Визы','Страховки','Трансферы','Круизы','VIP travel','Корпоративные поездки','Экскурсии','Ж/д билеты','Аренда авто','Билеты на концерт','Досуг','Другое'];
+const CATEGORIES=['Авиабилеты','Отели','Туры','Визы','Страховки','Трансферы','Круизы','Fast track / VIP','Корпоративные поездки','Экскурсии','Ж/д билеты','Аренда авто','Билеты на концерт','Досуг','Другое'];
 const CURRENCIES=[{code:'RUB',symbol:'₽',label:'Рубль'},{code:'USD',symbol:'$',label:'Доллар США'},{code:'EUR',symbol:'€',label:'Евро'},{code:'AED',symbol:'AED',label:'Дирхам ОАЭ'},{code:'TRY',symbol:'₺',label:'Турецкая лира'},{code:'CHF',symbol:'CHF',label:'Швейцарский франк'}];
 const STATUSES=[
   {id:'В работе',color:'#FFA726',bg:'#FFF3E0'},
@@ -184,7 +184,7 @@ const STATUSES=[
   {id:'Возврат',color:'#D32F2F',bg:'#FFEBEE'},
   {id:'Завершен',color:'#546E7A',bg:'#ECEFF1'}
 ];
-const PAID_CLIENT='Оплачено клиентом';
+const PAID_CLIENT='Завершен';
 const isPaidClient=d=>d&&d.status===PAID_CLIENT;
 const CB_MARKUP=1.035;
 const RATES_CACHE_KEY='rm-travel-rates-cache';
