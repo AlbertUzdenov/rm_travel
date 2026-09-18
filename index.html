@@ -991,7 +991,7 @@ const Deals=({deals,clients,services,reload,isMobile})=>{
                   const authorLabel=d.createdByName||d.createdByEmail||'—';
                   const authorShort=authorLabel.length>16?authorLabel.slice(0,14)+'…':authorLabel;
                   return (
-                    <tr key={d.id} style={{borderBottom:'1px solid #f0f0f0',opacity:deleting===d.id?0.3:paid?1:0.75,cursor:'pointer'}}
+                    <tr key={d.id} style={{borderBottom:'1px solid #f0f0f0',opacity:deleting===d.id?0.3:paid?1:0.75,cursor:'pointer',background:paid?'#EEEEEE':'transparent'}}
                       onClick={()=>setViewDeal(d)}>
                       <td style={{padding:'10px',fontWeight:700,color:BRAND,fontSize:12,whiteSpace:'nowrap'}}>{d.dealNumber?'№'+d.dealNumber:'—'}</td>
                       <td style={{padding:'10px',color:'#666',whiteSpace:'nowrap',fontSize:12}}>{new Date(d.date).toLocaleDateString('ru-RU')}</td>
@@ -1648,6 +1648,11 @@ const Analytics=({deals,services,clients,isMobile})=>{
   const yearCompare=useMemo(()=>MONTHS_SHORT.map((m,i)=>{const row={month:m};years.forEach(y=>{row[y.toString()]=paid.filter(d=>new Date(d.date).getFullYear()===y&&new Date(d.date).getMonth()===i).reduce((s,d)=>s+(d.commissionRub||0),0);});return row;}),[paid,years]);
   const serviceStats=useMemo(()=>{const map={};scope.forEach(d=>{const sid=d.serviceId||'__no__';const s=services.find(x=>x.id===d.serviceId);const name=s?s.name:(d.title||'Без услуги');if(!map[sid])map[sid]={name,count:0,revenue:0,gross:0};map[sid].count+=1;map[sid].revenue+=d.commissionRub||0;map[sid].gross+=d.grossRub||0;});return Object.values(map).map(s=>({...s,avg:s.count?s.revenue/s.count:0})).sort((a,b)=>b.revenue-a.revenue);},[scope,services]);
   const conversionStats=useMemo(()=>services.map(s=>{const all=deals.filter(d=>d.serviceId===s.id);const ok=all.filter(isPaidClient);return{name:s.name,total:all.length,paid:ok.length,conv:all.length?(ok.length/all.length*100):0};}).filter(s=>s.total>0).sort((a,b)=>b.conv-a.conv).slice(0,10),[services,deals]);
+  const [authorFilter,setAuthorFilter]=useState('all');
+  const authorsList=useMemo(()=>{const set=new Set();deals.forEach(d=>{const a=d.createdByName||d.createdByEmail;if(a)set.add(a);});return [...set].sort();},[deals]);
+  const authorScope=useMemo(()=>paid.filter(d=>{const dt=new Date(d.date);if(filterYear!=='all'&&dt.getFullYear()!==Number(filterYear))return false;if(filterMonth!=='all'&&dt.getMonth()!==Number(filterMonth))return false;const a=d.createdByName||d.createdByEmail||'—';if(authorFilter!=='all'&&a!==authorFilter)return false;return true;}),[paid,filterYear,filterMonth,authorFilter]);
+  const authorStats=useMemo(()=>({count:authorScope.length,revenue:authorScope.reduce((s,d)=>s+(d.commissionRub||0),0),gross:authorScope.reduce((s,d)=>s+(d.grossRub||0),0),avg:authorScope.length?authorScope.reduce((s,d)=>s+(d.commissionRub||0),0)/authorScope.length:0}),[authorScope]);
+  const authorRanking=useMemo(()=>{const map={};paid.forEach(d=>{const dt=new Date(d.date);if(filterYear!=='all'&&dt.getFullYear()!==Number(filterYear))return;if(filterMonth!=='all'&&dt.getMonth()!==Number(filterMonth))return;const a=d.createdByName||d.createdByEmail||'—';if(!map[a])map[a]={name:a,count:0,revenue:0,gross:0};map[a].count+=1;map[a].revenue+=d.commissionRub||0;map[a].gross+=d.grossRub||0;});return Object.values(map).sort((x,y)=>y.revenue-x.revenue);},[paid,filterYear,filterMonth]);
   if(paid.length===0) return <div><h1 style={{margin:'0 0 16px',fontSize:24}}>Аналитика</h1><PaidOnlyBanner/><div style={{background:'white',borderRadius:12,padding:60,textAlign:'center'}}><div style={{fontSize:36}}>📈</div><div style={{color:'#888',marginTop:12}}>Нет данных</div></div></div>;
   return (
     <div>
@@ -1656,6 +1661,36 @@ const Analytics=({deals,services,clients,isMobile})=>{
         <select value={filterYear} onChange={e=>setFilterYear(e.target.value)} style={{...inp,width:isMobile?'calc(50% - 5px)':'auto'}}><option value="all">Все годы</option>{years.map(y=><option key={y} value={y}>{y}</option>)}</select>
         <select value={filterMonth} onChange={e=>setFilterMonth(e.target.value)} style={{...inp,width:isMobile?'calc(50% - 5px)':'auto'}}><option value="all">Все месяцы</option>{MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
         {!isMobile&&<div style={{marginLeft:'auto',fontSize:13,color:'#666'}}>В выборке: <b>{scope.length}</b></div>}
+      </div>
+      <div style={{background:'white',borderRadius:12,padding:isMobile?16:20,marginBottom:16,boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
+        <h3 style={{margin:'0 0 16px',fontSize:16}}>Статистика по автору сделок</h3>
+        <div style={{marginBottom:16}}>
+          <select value={authorFilter} onChange={e=>setAuthorFilter(e.target.value)} style={{...inp,width:isMobile?'100%':320}}>
+            <option value="all">Все авторы</option>
+            {authorsList.map(a=><option key={a} value={a}>{a}</option>)}
+          </select>
+          <div style={{fontSize:12,color:'#888',marginTop:6}}>Фильтр по году и месяцу берётся из выбора выше</div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(4,1fr)',gap:12,marginBottom:16}}>
+          {[['Сделок',authorStats.count,'#222'],['Доход',fmtRub(authorStats.revenue),BRAND],['Оборот',fmtRub(authorStats.gross),'#7C4DFF'],['Средний чек',fmtRub(authorStats.avg),'#FFA726']].map(([l,v,col])=>(
+            <div key={l} style={{padding:14,background:BRAND_LIGHT,borderRadius:8}}><div style={{fontSize:11,color:'#666',textTransform:'uppercase'}}>{l}</div><div style={{fontSize:isMobile?16:20,fontWeight:700,color:col}}>{v}</div></div>
+          ))}
+        </div>
+        <h4 style={{margin:'0 0 10px',fontSize:14}}>Рейтинг авторов за период</h4>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',fontSize:13,minWidth:isMobile?400:'auto'}}>
+            <thead><tr style={{background:BRAND_LIGHT}}><th style={{padding:10,textAlign:'left'}}>#</th><th style={{padding:10,textAlign:'left'}}>Автор</th><th style={{padding:10,textAlign:'right'}}>Сделок</th><th style={{padding:10,textAlign:'right'}}>Оборот</th><th style={{padding:10,textAlign:'right'}}>Доход</th></tr></thead>
+            <tbody>{authorRanking.map((a,i)=>(
+              <tr key={a.name} style={{borderBottom:'1px solid #f0f0f0',background:(authorFilter!=='all'&&a.name===authorFilter)?'#FFF9C4':'transparent'}}>
+                <td style={{padding:10,color:'#888'}}>{i+1}</td>
+                <td style={{padding:10,fontWeight:500}}>{a.name}</td>
+                <td style={{padding:10,textAlign:'right'}}>{a.count}</td>
+                <td style={{padding:10,textAlign:'right'}}>{fmtRub(a.gross)}</td>
+                <td style={{padding:10,textAlign:'right',fontWeight:600,color:BRAND}}>{fmtRub(a.revenue)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
       </div>
       <div style={{background:'white',borderRadius:12,padding:isMobile?16:20,marginBottom:16,boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
         <h3 style={{margin:'0 0 16px',fontSize:16}}>Сравнение по годам</h3>
