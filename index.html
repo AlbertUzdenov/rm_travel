@@ -1729,7 +1729,7 @@ const Analytics=({deals,services,clients,isMobile})=>{
 };
 
 // ============ SETTINGS ============
-const SettingsView=({deals,clients,services,user,reload,isMobile})=>{
+const SettingsView=({deals,clients,services,user,reload,isMobile,isAdmin})=>{
   const [importing,setImporting]=useState(false);
   const totalIncome=deals.filter(isPaidClient).reduce((s,d)=>s+(d.commissionRub||0),0);
 
@@ -1771,7 +1771,7 @@ const SettingsView=({deals,clients,services,user,reload,isMobile})=>{
         </div>
         <div style={{marginTop:12,padding:16,background:'#F1F8E9',borderRadius:8}}><div style={{fontSize:12,color:'#666'}}>Общий доход</div><div style={{fontSize:22,fontWeight:700,color:BRAND}}>{fmtRub(totalIncome)}</div></div>
       </div>
-      <UserManagement currentUserEmail={user?.email} isMobile={isMobile}/>
+      {isAdmin&&<UserManagement currentUserEmail={user?.email} isMobile={isMobile}/>}
       <div style={{background:'white',borderRadius:12,padding:24,marginBottom:16,boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
         <h3 style={{margin:'0 0 12px',fontSize:16}}>☁️ Облачное хранилище</h3>
         <p style={{margin:'0 0 10px',fontSize:13,color:'#666'}}>Данные хранятся в <b>Supabase</b> и доступны всей команде. Вошли как: <b>{user?.email}</b></p>
@@ -1923,6 +1923,7 @@ function App(){
   const [user,setUser]=useState(null);
   const [authChecked,setAuthChecked]=useState(false);
   const [approved,setApproved]=useState(false);
+  const [isAdmin,setIsAdmin]=useState(false);
   const [deals,setDeals]=useState([]);
   const [clients,setClients]=useState([]);
   const [services,setServices]=useState([]);
@@ -1944,6 +1945,7 @@ function App(){
     (async()=>{
       const{data}=await sb.from('user_approvals').select('*').eq('user_id',user.id).single();
       setApproved(data?.approved===true);
+      setIsAdmin(data?.is_admin===true);
     })();
   },[user]);
 
@@ -2003,7 +2005,7 @@ function App(){
           {view==='finance'&&<Finance deals={deals} isMobile={isMobile}/>}
           {view==='analytics'&&<Analytics deals={deals} services={services} clients={clients} isMobile={isMobile}/>}
           {view==='accounts'&&<Accounts accounts={accounts} reload={reload} user={user} isMobile={isMobile}/>}
-          {view==='settings'&&<SettingsView deals={deals} clients={clients} services={services} user={user} reload={reload} isMobile={isMobile}/>}
+          {view==='settings'&&<SettingsView deals={deals} clients={clients} services={services} user={user} reload={reload} isMobile={isMobile} isAdmin={isAdmin}/>}
         </div>
         <Sidebar view={view} setView={setView} user={user} onLogout={logout} isMobile={isMobile}/>
       </div>
@@ -2023,7 +2025,7 @@ function App(){
         {view==='finance'&&<Finance deals={deals} isMobile={isMobile}/>}
         {view==='analytics'&&<Analytics deals={deals} services={services} clients={clients} isMobile={isMobile}/>}
         {view==='accounts'&&<Accounts accounts={accounts} reload={reload} user={user} isMobile={isMobile}/>}
-          {view==='settings'&&<SettingsView deals={deals} clients={clients} services={services} user={user} reload={reload} isMobile={isMobile}/>}
+          {view==='settings'&&<SettingsView deals={deals} clients={clients} services={services} user={user} reload={reload} isMobile={isMobile} isAdmin={isAdmin}/>}
       </div>
     </div>
   );
