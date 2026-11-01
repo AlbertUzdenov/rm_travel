@@ -196,6 +196,9 @@ const Icon=({name,size=16,color='currentColor',style={}})=>{
     briefcase:<><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>,
     users:<><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
     wallet:<><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></>,
+    key:<><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></>,
+    copy:<><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>,
+    eye:<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
     chart:<><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
     settings:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
     search:<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
@@ -510,6 +513,7 @@ const Sidebar=({view,setView,user,onLogout,isMobile})=>{
     {id:'services',icon:'tag',label:'Услуги'},
     {id:'finance',icon:'wallet',label:'Финансы'},
     {id:'analytics',icon:'chart',label:'Аналитика'},
+    {id:'accounts',icon:'key',label:'Личные кабинеты'},
     {id:'settings',icon:'settings',label:'Настройки'},
   ];
   const displayName=user?.user_metadata?.full_name||user?.email?.split('@')[0]||'Пользователь';
@@ -1793,6 +1797,126 @@ const SettingsView=({deals,clients,services,user,reload,isMobile})=>{
   );
 };
 
+// ============ ЛИЧНЫЕ КАБИНЕТЫ ============
+const CopyBtn=({value,label})=>{
+  const [copied,setCopied]=useState(false);
+  const doCopy=async(e)=>{
+    e.stopPropagation();
+    try{await navigator.clipboard.writeText(value||'');}catch(err){const t=document.createElement('textarea');t.value=value||'';document.body.appendChild(t);t.select();try{document.execCommand('copy');}catch(e2){}document.body.removeChild(t);}
+    setCopied(true);setTimeout(()=>setCopied(false),1200);
+  };
+  return (
+    <button onClick={doCopy} title={'Копировать '+(label||'')} style={{padding:'6px 10px',background:copied?'#E8F5E9':BRAND_LIGHT,color:copied?'#2E7D32':BRAND,border:'none',borderRadius:6,cursor:'pointer',fontSize:12,fontWeight:600,display:'flex',alignItems:'center',gap:5,whiteSpace:'nowrap'}}>
+      <Icon name="copy" size={13} color={copied?'#2E7D32':BRAND}/>{copied?'Скопировано':'Копировать'}
+    </button>
+  );
+};
+
+const Accounts=({accounts,reload,user,isMobile})=>{
+  const [search,setSearch]=useState('');
+  const [editing,setEditing]=useState(null);
+  const [showPass,setShowPass]=useState({});
+
+  const filtered=accounts.filter(a=>{const q=search.toLowerCase();return !q||(a.name+' '+(a.login||'')+' '+(a.note||'')).toLowerCase().includes(q);});
+
+  const saveAccount=async(a)=>{
+    const row={id:a.id,name:a.name,login:a.login||'',password:a.password||'',note:a.note||'',updated_at:new Date().toISOString()};
+    if(accounts.find(x=>x.id===a.id)){
+      await sb.from('accounts').update(row).eq('id',a.id);
+    }else{
+      row.created_by=user?.id||null;
+      row.created_by_email=user?.email||null;
+      row.created_by_name=user?.user_metadata?.full_name||user?.email||null;
+      row.created_at=new Date().toISOString();
+      await sb.from('accounts').insert(row);
+    }
+    reload();setEditing(null);
+  };
+  const deleteAccount=async(id)=>{
+    if(!confirm('Удалить этот личный кабинет?'))return;
+    await sb.from('accounts').delete().eq('id',id);
+    reload();
+  };
+
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+        <div><h1 style={{margin:0,fontSize:isMobile?20:24}}>Личные кабинеты</h1><p style={{margin:'4px 0 0',color:'#888',fontSize:14}}>Логины и пароли поставщиков · {accounts.length}</p></div>
+        <button onClick={()=>setEditing({id:uid(),name:'',login:'',password:'',note:''})} style={btnPri} className="btn-primary">
+          <Icon name="plus" size={14} color="white" style={{verticalAlign:'middle',marginRight:isMobile?0:4}}/>{!isMobile&&'Добавить кабинет'}
+        </button>
+      </div>
+
+      <div style={{background:'white',borderRadius:12,padding:16,marginBottom:16,boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
+        <div style={{position:'relative'}}><span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}><Icon name="search" size={16} color="#888"/></span><input placeholder="Поиск по названию, логину..." value={search} onChange={e=>setSearch(e.target.value)} style={{...inp,paddingLeft:36}}/></div>
+      </div>
+
+      {filtered.length===0 ? (
+        <div style={{background:'white',borderRadius:12,padding:60,textAlign:'center'}}><div style={{fontSize:36,marginBottom:12}}>🔐</div><div>{accounts.length===0?'Кабинетов ещё нет':'Ничего не найдено'}</div></div>
+      ):(
+        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill, minmax(340px, 1fr))',gap:14}}>
+          {filtered.map(a=>(
+            <div key={a.id} style={{background:'white',borderRadius:12,padding:18,boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14,gap:8}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
+                  <div style={{width:38,height:38,borderRadius:8,background:BRAND_LIGHT,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Icon name="key" size={18} color={BRAND}/></div>
+                  <div style={{fontWeight:600,fontSize:16,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.name}</div>
+                </div>
+                <div style={{display:'flex',gap:6,flexShrink:0}}>
+                  <span style={{cursor:'pointer'}} onClick={()=>setEditing({...a})}><Icon name="edit" size={15} color={BRAND}/></span>
+                  <span style={{cursor:'pointer'}} onClick={()=>deleteAccount(a.id)}><Icon name="trash" size={15} color="#d32f2f"/></span>
+                </div>
+              </div>
+
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:11,color:'#aaa',marginBottom:4,textTransform:'uppercase',letterSpacing:0.3}}>Логин</div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <div style={{flex:1,fontSize:14,fontFamily:'monospace',background:'#fafafa',padding:'8px 10px',borderRadius:6,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0}}>{a.login||'—'}</div>
+                  {a.login&&<CopyBtn value={a.login} label="логин"/>}
+                </div>
+              </div>
+
+              <div style={{marginBottom:a.note?12:0}}>
+                <div style={{fontSize:11,color:'#aaa',marginBottom:4,textTransform:'uppercase',letterSpacing:0.3}}>Пароль</div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <div style={{flex:1,fontSize:14,fontFamily:'monospace',background:'#fafafa',padding:'8px 10px',borderRadius:6,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0}}>{a.password?(showPass[a.id]?a.password:'••••••••'):'—'}</div>
+                  {a.password&&<span style={{cursor:'pointer',padding:6}} onClick={()=>setShowPass(p=>({...p,[a.id]:!p[a.id]}))} title={showPass[a.id]?'Скрыть':'Показать'}><Icon name="eye" size={15} color={showPass[a.id]?BRAND:'#999'}/></span>}
+                  {a.password&&<CopyBtn value={a.password} label="пароль"/>}
+                </div>
+              </div>
+
+              {a.note&&(
+                <div style={{paddingTop:12,borderTop:'1px solid #f0f0f0'}}>
+                  <div style={{fontSize:11,color:'#aaa',marginBottom:4,textTransform:'uppercase',letterSpacing:0.3}}>Комментарий</div>
+                  <div style={{fontSize:13,color:'#555',lineHeight:1.5,whiteSpace:'pre-wrap'}}>{a.note}</div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editing&&(
+        <div className={isMobile?'modal-overlay-mobile':''} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',display:'flex',alignItems:isMobile?'flex-start':'center',justifyContent:'center',zIndex:200,padding:isMobile?12:20}} onClick={()=>setEditing(null)}>
+          <div className={isMobile?'modal-sheet-mobile':''} style={{background:'white',borderRadius:14,padding:isMobile?20:24,width:isMobile?'100%':480,maxHeight:isMobile?'none':'auto',overflow:isMobile?'visible':'auto'}} onClick={e=>e.stopPropagation()}>
+            <h3 style={{margin:'0 0 16px'}}>{accounts.find(x=>x.id===editing.id)?'Редактировать кабинет':'Новый личный кабинет'}</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+              <Field label="Название" required><input value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})} style={inp} autoFocus placeholder="Например: Островок"/></Field>
+              <Field label="Логин"><input value={editing.login} onChange={e=>setEditing({...editing,login:e.target.value})} style={inp} placeholder="логин / email"/></Field>
+              <Field label="Пароль"><input value={editing.password} onChange={e=>setEditing({...editing,password:e.target.value})} style={inp} placeholder="пароль"/></Field>
+              <Field label="Комментарий"><textarea value={editing.note} onChange={e=>setEditing({...editing,note:e.target.value})} style={{...inp,minHeight:70,resize:'vertical'}} placeholder="Доп. информация..."/></Field>
+            </div>
+            <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}>
+              <button onClick={()=>setEditing(null)} style={{...btnSec,flex:isMobile?1:'none'}}>Отмена</button>
+              <button onClick={()=>editing.name.trim()&&saveAccount(editing)} style={{...btnPri,flex:isMobile?1:'none'}} className="btn-primary">Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ============ APP ============
 function App(){
   const isMobile=useIsMobile();
@@ -1802,6 +1926,7 @@ function App(){
   const [deals,setDeals]=useState([]);
   const [clients,setClients]=useState([]);
   const [services,setServices]=useState([]);
+  const [accounts,setAccounts]=useState([]);
   const [loading,setLoading]=useState(false);
   const [view,setView]=useState('dashboard');
   const [year,setYear]=useState(new Date().getFullYear());
@@ -1835,6 +1960,8 @@ function App(){
     setDeals((d||[]).map(r=>({...r,dealNumber:r.deal_number,startDate:r.start_date,endDate:r.end_date,cancelDeadline:r.cancel_deadline,clientId:r.client_id,serviceId:r.service_id,rateSource:r.rate_source,rateWithMarkup:r.rate_with_markup,grossRub:r.gross_rub,netRub:r.net_rub,commissionRub:r.commission_rub,createdAt:r.created_at,updatedAt:r.updated_at,createdBy:r.created_by,createdByEmail:r.created_by_email,createdByName:r.created_by_name})));
     setClients((c||[]).map(r=>({...r,firstName:r.first_name,lastName:r.last_name,createdAt:r.created_at})));
     setServices((s||[]).map(r=>({...r,createdAt:r.created_at})));
+    const{data:ac}=await sb.from('accounts').select('*').order('created_at',{ascending:false});
+    setAccounts((ac||[]).map(r=>({...r,createdBy:r.created_by,createdByEmail:r.created_by_email,createdByName:r.created_by_name,createdAt:r.created_at})));
     setLoading(false);
   },[user]);
 
@@ -1875,6 +2002,7 @@ function App(){
           {view==='services'&&<Services services={services} deals={deals} clients={clients} reload={reload} isMobile={isMobile}/>}
           {view==='finance'&&<Finance deals={deals} isMobile={isMobile}/>}
           {view==='analytics'&&<Analytics deals={deals} services={services} clients={clients} isMobile={isMobile}/>}
+          {view==='accounts'&&<Accounts accounts={accounts} reload={reload} user={user} isMobile={isMobile}/>}
           {view==='settings'&&<SettingsView deals={deals} clients={clients} services={services} user={user} reload={reload} isMobile={isMobile}/>}
         </div>
         <Sidebar view={view} setView={setView} user={user} onLogout={logout} isMobile={isMobile}/>
@@ -1894,7 +2022,8 @@ function App(){
         {view==='services'&&<Services services={services} deals={deals} clients={clients} reload={reload} isMobile={isMobile}/>}
         {view==='finance'&&<Finance deals={deals} isMobile={isMobile}/>}
         {view==='analytics'&&<Analytics deals={deals} services={services} clients={clients} isMobile={isMobile}/>}
-        {view==='settings'&&<SettingsView deals={deals} clients={clients} services={services} user={user} reload={reload} isMobile={isMobile}/>}
+        {view==='accounts'&&<Accounts accounts={accounts} reload={reload} user={user} isMobile={isMobile}/>}
+          {view==='settings'&&<SettingsView deals={deals} clients={clients} services={services} user={user} reload={reload} isMobile={isMobile}/>}
       </div>
     </div>
   );
