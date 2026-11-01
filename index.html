@@ -497,7 +497,7 @@ const KpiCard=({icon,label,value,sub,color=BRAND})=>(
 const PaidOnlyBanner=()=>(
   <div style={{background:'#E8F5E9',border:'1px solid #C8E6C9',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#2E7D32',display:'flex',alignItems:'center',gap:8}}>
     <Icon name="info" size={14} color="#2E7D32"/>
-    Финансовые метрики учитывают только сделки со статусом <b>«Оплачено клиентом»</b>.
+    Финансовые метрики учитывают только сделки со статусом <b>«Завершен»</b>.
   </div>
 );
 
@@ -832,7 +832,7 @@ const DealForm=({deal,clients,services,onSave,onClose,addClient,addService,isMob
           <Field label="Брутто" required error={errors.gross}><input type="number" step="0.01" value={d.gross||''} onChange={e=>setField('gross',parseFloat(e.target.value)||0)} placeholder="0" style={inp}/></Field>
           <Field label="Комиссия" hint="авто"><input value={commission.toLocaleString('ru-RU',{maximumFractionDigits:2})+' '+(CURRENCIES.find(c=>c.code===d.currency)?.symbol||'')} style={inpReadOnly} readOnly/></Field>
           <Field label="Комиссия в ₽" hint="по курсу с наценкой"><input value={fmtRub(commissionRub)} style={{...inpReadOnly,fontWeight:600,color:BRAND}} readOnly/></Field>
-          <Field label="Статус" full hint="только «Оплачено клиентом» — в финансах">
+          <Field label="Статус" full hint="только «Завершен» — в финансах">
             <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
               {STATUSES.map(s=><div key={s.id} onClick={()=>setField('status',s.id)} style={{padding:'8px 14px',borderRadius:8,border:'2px solid '+(d.status===s.id?s.color:'#eee'),cursor:'pointer',background:d.status===s.id?s.bg:'white',color:d.status===s.id?s.color:'#666',fontSize:12,fontWeight:600,transition:'all 0.15s'}}>{s.id}</div>)}
             </div>
@@ -867,6 +867,8 @@ const Deals=({deals,clients,services,reload,isMobile})=>{
   const [filterCategory,setFilterCategory]=useState('all');
   const [filterStartFrom,setFilterStartFrom]=useState('');
   const [filterStartTo,setFilterStartTo]=useState('');
+  const [filterEndFrom,setFilterEndFrom]=useState('');
+  const [filterEndTo,setFilterEndTo]=useState('');
   const [editing,setEditing]=useState(null);
   const [showForm,setShowForm]=useState(false);
   const [deleting,setDeleting]=useState(null);
@@ -884,8 +886,10 @@ const Deals=({deals,clients,services,reload,isMobile})=>{
     if(filterCategory!=='all'&&d.category!==filterCategory)return false;
     if(filterStartFrom&&d.startDate&&d.startDate<filterStartFrom)return false;
     if(filterStartTo&&d.startDate&&d.startDate>filterStartTo)return false;
+    if(filterEndFrom&&d.endDate&&d.endDate<filterEndFrom)return false;
+    if(filterEndTo&&d.endDate&&d.endDate>filterEndTo)return false;
     return true;
-  }).sort((a,b)=>new Date(b.date)-new Date(a.date)),[deals,clients,services,search,filterYear,filterMonth,filterStatus,filterCategory,filterStartFrom,filterStartTo]);
+  }).sort((a,b)=>new Date(b.date)-new Date(a.date)),[deals,clients,services,search,filterYear,filterMonth,filterStatus,filterCategory,filterStartFrom,filterStartTo,filterEndFrom,filterEndTo]);
 
   const paidFiltered=filtered.filter(isPaidClient);
 
@@ -969,8 +973,8 @@ const Deals=({deals,clients,services,reload,isMobile})=>{
         <select value={filterMonth} onChange={e=>setFilterMonth(e.target.value)} style={{...inp,width:'auto'}}><option value="all">Все месяцы</option>{MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
         <select value={filterCategory} onChange={e=>setFilterCategory(e.target.value)} style={{...inp,width:'auto'}}><option value="all">Все категории</option>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select>
         <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{...inp,width:'auto'}}><option value="all">Все статусы</option>{STATUSES.map(s=><option key={s.id} value={s.id}>{s.id}</option>)}</select>
-        <input type="date" value={filterStartFrom} onChange={e=>setFilterStartFrom(e.target.value)} style={{...inp,width:'auto'}} title="Старт с"/>
-        <input type="date" value={filterStartTo} onChange={e=>setFilterStartTo(e.target.value)} style={{...inp,width:'auto'}} title="Старт по"/>
+        <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:12,color:'#888',whiteSpace:'nowrap'}}>Старт:</span><input type="date" value={filterStartFrom} onChange={e=>setFilterStartFrom(e.target.value)} style={{...inp,width:'auto'}} title="Старт с"/><span style={{color:'#ccc'}}>—</span><input type="date" value={filterStartTo} onChange={e=>setFilterStartTo(e.target.value)} style={{...inp,width:'auto'}} title="Старт по"/></div>
+        <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:12,color:'#888',whiteSpace:'nowrap'}}>Конец:</span><input type="date" value={filterEndFrom} onChange={e=>setFilterEndFrom(e.target.value)} style={{...inp,width:'auto'}} title="Конец с"/><span style={{color:'#ccc'}}>—</span><input type="date" value={filterEndTo} onChange={e=>setFilterEndTo(e.target.value)} style={{...inp,width:'auto'}} title="Конец по"/></div>
       </div>
 
       <div style={{background:'white',borderRadius:12,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
@@ -1773,7 +1777,7 @@ const SettingsView=({deals,clients,services,user,reload,isMobile})=>{
       </div>
       <div style={{background:'white',borderRadius:12,padding:24,boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
         <h3 style={{margin:'0 0 8px',fontSize:16}}>Логика учёта</h3>
-        <p style={{margin:'0 0 6px',fontSize:13,color:'#666'}}>В финансах учитываются только сделки <b>«Оплачено клиентом»</b>.</p>
+        <p style={{margin:'0 0 6px',fontSize:13,color:'#666'}}>В финансах учитываются только сделки <b>«Завершен»</b>.</p>
         <p style={{margin:0,fontSize:13,color:'#666'}}>Статус <b>«Оплачено поставщику»</b> отражает расчёт с поставщиком и не влияет на выручку.</p>
       </div>
     </div>
