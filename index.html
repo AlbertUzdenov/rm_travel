@@ -100,7 +100,32 @@ function createSupabaseClient(baseUrl, apiKey) {
 
   const channel = () => { const ch = { on: () => ch, subscribe: () => ch }; return ch; };
   const removeChannel = () => {};
-  return { auth, from, channel, removeChannel };
+  const storage = {
+    from: (bucket) => ({
+      upload: async (path, file) => {
+        try {
+          const r = await fetch(baseUrl + '/storage/v1/object/' + bucket + '/' + path, { method: 'POST', headers: { apikey: apiKey, Authorization: 'Bearer ' + (getT() || apiKey), 'x-upsert': 'true', 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+          if (!r.ok) { const e = await r.json().catch(() => ({})); return { data: null, error: { message: e.message || ('HTTP ' + r.status) } }; }
+          return { data: await r.json(), error: null };
+        } catch (e) { return { data: null, error: { message: e.message } }; }
+      },
+      download: async (path) => {
+        try {
+          const r = await fetch(baseUrl + '/storage/v1/object/authenticated/' + bucket + '/' + path, { headers: { apikey: apiKey, Authorization: 'Bearer ' + (getT() || apiKey) } });
+          if (!r.ok) return { data: null, error: { message: 'HTTP ' + r.status } };
+          return { data: await r.blob(), error: null };
+        } catch (e) { return { data: null, error: { message: e.message } }; }
+      },
+      remove: async (paths) => {
+        try {
+          const r = await fetch(baseUrl + '/storage/v1/object/' + bucket, { method: 'DELETE', headers: { apikey: apiKey, Authorization: 'Bearer ' + (getT() || apiKey), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: Array.isArray(paths) ? paths : [paths] }) });
+          if (!r.ok) { const e = await r.json().catch(() => ({})); return { data: null, error: { message: e.message || ('HTTP ' + r.status) } }; }
+          return { data: await r.json().catch(() => ({})), error: null };
+        } catch (e) { return { data: null, error: { message: e.message } }; }
+      }
+    })
+  };
+  return { auth, from, storage, channel, removeChannel };
 }
 window.createSupabaseClient = createSupabaseClient;
 </script>
@@ -1197,6 +1222,12 @@ const Clients=({clients,deals,services,reload,isMobile})=>{
     reload();
     setSelected(prev=>({...prev,comments}));
   };
+  const updateFiles=async files=>{
+    if(!selected)return;
+    await sb.from('clients').update({files}).eq('id',selected.id);
+    reload();
+    setSelected(prev=>({...prev,files}));
+  };
 
   const addComment=async()=>{
     if(!commentText.trim()||!selected)return;
@@ -1302,6 +1333,11 @@ const Clients=({clients,deals,services,reload,isMobile})=>{
               </table>
               )
             ):<div style={{textAlign:'center',padding:24,color:'#888',marginBottom:24}}>Нет сделок</div>}
+
+            <div style={{borderTop:'2px solid #f0f0f0',paddingTop:20,marginBottom:4}}>
+              <h3 style={{margin:'0 0 14px',fontSize:16,display:'flex',alignItems:'center',gap:8}}><Icon name="file" size={16} color={BRAND}/>Документы ({(selectedEnriched.files||[]).length})</h3>
+              <ClientFiles files={selectedEnriched.files||[]} clientId={selectedEnriched.id} onChange={updateFiles}/>
+            </div>
 
             <div style={{borderTop:'2px solid #f0f0f0',paddingTop:20}}>
               <h3 style={{margin:'0 0 14px',fontSize:16,display:'flex',alignItems:'center',gap:8}}><Icon name="message" size={16} color={BRAND}/>Комментарии ({(selectedEnriched.comments||[]).length})</h3>
@@ -1809,6 +1845,66 @@ const SettingsView=({deals,clients,services,user,reload,isMobile,isAdmin})=>{
 };
 
 // ============ ЛИЧНЫЕ КАБИНЕТЫ ============
+const ClientFiles=({files,clientId,onChange})=>{
+  const [uploading,setUploading]=useState(false);
+  const inputRef=useRef(null);
+  const allowed=['.pdf','.jpg','.jpeg','.png','.docx','.xlsx','.heic'];
+  const MAX=15*1024*1024;
+  const doUpload=async(fileList)=>{
+    const errors=[];const added=[];
+    setUploading(true);
+    for(const file of fileList){
+      const ext='.'+file.name.split('.').pop().toLowerCase();
+      if(file.size>MAX){errors.push(file.name+': больше 15 МБ');continue;}
+      if(!allowed.includes(ext)){errors.push(file.name+': недопустимый формат');continue;}
+      const id=uid();
+      const safe=file.name.replace(/[^a-zA-Z0-9.\-_]/g,'_');
+      const path='clients/'+clientId+'/'+id+'-'+safe;
+      const{error}=await sb.storage.from('client-files').upload(path,file);
+      if(error){errors.push(file.name+': '+error.message);continue;}
+      added.push({id,name:file.name,size:file.size,type:file.type,path,uploadedAt:new Date().toISOString()});
+    }
+    setUploading(false);
+    if(errors.length)alert(errors.join('\n'));
+    if(added.length)onChange([...(files||[]),...added]);
+  };
+  const doDownload=async(f)=>{
+    const{data,error}=await sb.storage.from('client-files').download(f.path);
+    if(error||!data){alert('Не удалось скачать файл: '+(error?error.message:''));return;}
+    const url=URL.createObjectURL(data);
+    const a=document.createElement('a');a.href=url;a.download=f.name;a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+  };
+  const doDelete=async(f)=>{
+    if(!confirm('Удалить файл «'+f.name+'»?'))return;
+    await sb.storage.from('client-files').remove([f.path]);
+    onChange((files||[]).filter(x=>x.id!==f.id));
+  };
+  return (
+    <div>
+      <div onClick={()=>!uploading&&inputRef.current&&inputRef.current.click()} style={{border:'2px dashed #ddd',borderRadius:8,padding:16,textAlign:'center',cursor:uploading?'default':'pointer',background:'#fafafa',marginBottom:(files||[]).length?10:0}}>
+        <Icon name="upload" size={20} color="#999"/>
+        <div style={{fontSize:13,color:'#666',marginTop:6}}>{uploading?'Загрузка...':'Нажмите, чтобы загрузить документы'}</div>
+        <div style={{fontSize:11,color:'#aaa',marginTop:4}}>PDF, JPG, PNG, DOCX, XLSX, HEIC · до 15 МБ</div>
+        <input ref={inputRef} type="file" multiple accept={allowed.join(',')} style={{display:'none'}} onChange={e=>{doUpload(e.target.files);e.target.value='';}}/>
+      </div>
+      {(files||[]).length>0&&(
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {(files||[]).map(f=>(
+            <div key={f.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',background:'white',border:'1px solid #eee',borderRadius:6}}>
+              <Icon name="file" size={16} color={BRAND}/>
+              <div style={{flex:1,minWidth:0,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</div>
+              <div style={{fontSize:11,color:'#888'}}>{fmtSize(f.size)}</div>
+              <button onClick={()=>doDownload(f)} style={{...btnGhost,padding:'2px 8px',fontSize:12}}>Скачать</button>
+              <span style={{cursor:'pointer'}} onClick={()=>doDelete(f)}><Icon name="trash" size={14} color="#d32f2f"/></span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CopyBtn=({value,label})=>{
   const [copied,setCopied]=useState(false);
   const doCopy=async(e)=>{
@@ -1977,7 +2073,7 @@ function App(){
     ]);
     // Convert snake_case to camelCase
     setDeals((d||[]).map(r=>({...r,dealNumber:r.deal_number,startDate:r.start_date,endDate:r.end_date,cancelDeadline:r.cancel_deadline,clientId:r.client_id,serviceId:r.service_id,rateSource:r.rate_source,rateWithMarkup:r.rate_with_markup,grossRub:r.gross_rub,netRub:r.net_rub,commissionRub:r.commission_rub,createdAt:r.created_at,updatedAt:r.updated_at,createdBy:r.created_by,createdByEmail:r.created_by_email,createdByName:r.created_by_name})));
-    setClients((c||[]).map(r=>({...r,firstName:r.first_name,lastName:r.last_name,createdAt:r.created_at})));
+    setClients((c||[]).map(r=>({...r,firstName:r.first_name,lastName:r.last_name,files:r.files||[],createdAt:r.created_at})));
     setServices((s||[]).map(r=>({...r,createdAt:r.created_at})));
     const{data:ac}=await sb.from('accounts').select('*').order('created_at',{ascending:false});
     setAccounts((ac||[]).map(r=>({...r,createdBy:r.created_by,createdByEmail:r.created_by_email,createdByName:r.created_by_name,createdAt:r.created_at})));
