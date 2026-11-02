@@ -26,6 +26,17 @@ function createSupabaseClient(baseUrl, apiKey) {
   const auth = {
     getSession: async () => { const t = getT(), u = getU(); return { data: { session: t && u ? { user: u, access_token: t } : null } }; },
     getUser: async () => ({ data: { user: getU() } }),
+    refreshSession: async () => {
+      const rt = getR();
+      if (!rt) return { data: { session: null }, error: { message: 'no refresh token' } };
+      try {
+        const r = await fetch(baseUrl + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { 'apikey': apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: rt }) });
+        const d = await r.json();
+        if (!r.ok || !d.access_token) return { data: { session: null }, error: { message: 'refresh failed' } };
+        setT(d.access_token); setR(d.refresh_token); setU(d.user);
+        return { data: { session: { user: d.user, access_token: d.access_token } }, error: null };
+      } catch (e) { return { data: { session: null }, error: { message: e.message } }; }
+    },
     signInWithPassword: async ({ email, password }) => {
       try {
         const r = await fetch(baseUrl + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { 'apikey': apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
@@ -1934,7 +1945,12 @@ function App(){
 
   // Auth
   useEffect(()=>{
-    sb.auth.getSession().then(({data:{session}})=>{setUser(session?.user||null);setAuthChecked(true);});
+    (async()=>{
+      const{data:{session:existing}}=await sb.auth.getSession();
+      if(existing){const{error}=await sb.auth.refreshSession();if(error){await sb.auth.signOut();setUser(null);setAuthChecked(true);return;}}
+      const{data:{session}}=await sb.auth.getSession();
+      setUser(session?.user||null);setAuthChecked(true);
+    })();
     const{data:{subscription}}=sb.auth.onAuthStateChange((_,session)=>{setUser(session?.user||null);});
     return()=>subscription.unsubscribe();
   },[]);
@@ -1943,7 +1959,8 @@ function App(){
   useEffect(()=>{
     if(!user){setApproved(false);return;}
     (async()=>{
-      const{data}=await sb.from('user_approvals').select('*').eq('user_id',user.id).single();
+      let{data,error}=await sb.from('user_approvals').select('*').eq('user_id',user.id).single();
+      if(error&&!data){await sb.auth.refreshSession();const retry=await sb.from('user_approvals').select('*').eq('user_id',user.id).single();data=retry.data;}
       setApproved(data?.approved===true);
       setIsAdmin(data?.is_admin===true);
     })();
