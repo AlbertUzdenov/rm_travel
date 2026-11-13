@@ -2312,8 +2312,6 @@ function App(){
 
   if(!user) return <AuthScreen onLogin={u=>setUser(u)}/>;
 
-  if(!approved) return <ApprovalPending user={user} onLogout={logout}/>;
-
   if(!mfaChecked) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'linear-gradient(135deg, #3D5F94, #5680BF)'}}><div style={{color:'white',fontSize:16,display:'flex',alignItems:'center',gap:12}}><div style={{width:24,height:24,border:'2px solid rgba(255,255,255,0.4)',borderTopColor:'white',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/> Проверка…<style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div></div>;
 
   if(hasMfa && aal!=='aal2') return <MfaChallenge factor={mfaFactor} isMobile={isMobile} onDone={()=>setAal('aal2')} onLogout={logout}/>;
