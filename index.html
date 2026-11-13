@@ -100,7 +100,8 @@ function createSupabaseClient(baseUrl, apiKey) {
           if (!r.ok) { const d = await r.json().catch(() => ({})); return { data: null, error: { message: d.msg || d.error || ('HTTP ' + r.status) } }; }
           return { data: {}, error: null };
         } catch (e) { return { data: null, error: { message: e.message } }; }
-      }
+      },
+      level: () => { try { const t = getT(); if (!t) return null; let b = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'); b += '='.repeat((4 - b.length % 4) % 4); const json = decodeURIComponent(atob(b).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); return JSON.parse(json).aal || null; } catch (e) { return null; } }
     },
     onAuthStateChange: (fn) => { listeners.push(fn); return { data: { subscription: { unsubscribe: () => { listeners = listeners.filter(f => f !== fn); } } } }; },
   };
@@ -423,8 +424,6 @@ const AuthScreen=({onLogin})=>{
       if(mode==='login'){
         const{data,error:err}=await sb.auth.signInWithPassword({email,password:pass});
         if(err)throw err;
-        const{data:fac}=await sb.auth.mfa.listFactors();
-        if(fac&&fac.verified&&fac.verified.length>0){setMfaUser(data.user);setMfaFactor(fac.verified[0]);setMfaCode('');setLoading(false);return;}
         onLogin(data.user);
       } else {
         const{data,error:err}=await sb.auth.signUp({email,password:pass,options:{data:{full_name:name}}});
@@ -2138,6 +2137,38 @@ const Accounts=({accounts,reload,user,isMobile})=>{
 };
 
 // ============ APP ============
+const MfaChallenge=({factor,isMobile,onDone,onLogout})=>{
+  const [code,setCode]=useState('');
+  const [error,setError]=useState('');
+  const [busy,setBusy]=useState(false);
+  const submit=async()=>{
+    const clean=code.replace(/\D/g,'');
+    if(clean.length<6||!factor)return;
+    setBusy(true);setError('');
+    const{data:ch,error:ce}=await sb.auth.mfa.challenge(factor.id);
+    if(ce||!ch){setError(ce?ce.message:'Ошибка, попробуйте ещё раз');setBusy(false);return;}
+    const{error:ve}=await sb.auth.mfa.verify(factor.id,ch.id,clean);
+    setBusy(false);
+    if(ve){setError('Неверный код. Проверьте время на телефоне и попробуйте снова.');setCode('');return;}
+    onDone&&onDone();
+  };
+  return (
+    <div style={{minHeight:'100vh',background:'linear-gradient(135deg, #3D5F94 0%, #5680BF 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+      <div style={{background:'white',borderRadius:16,padding:isMobile?28:40,width:isMobile?'100%':400,boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
+        <div style={{textAlign:'center',marginBottom:24}}>
+          <div style={{fontSize:28,fontWeight:700,color:BRAND,letterSpacing:1}}>РМ ТРЕВЕЛ</div>
+          <div style={{fontSize:14,color:'#888',marginTop:4}}>Двухфакторная защита</div>
+        </div>
+        <div style={{fontSize:13,color:'#555',textAlign:'center',marginBottom:16}}>Введите 6-значный код из приложения-аутентификатора</div>
+        <input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="______" inputMode="numeric" autoFocus onKeyDown={e=>e.key==='Enter'&&submit()} style={{...inp,textAlign:'center',fontSize:24,letterSpacing:10,fontWeight:700}}/>
+        {error&&<div style={{background:'#FFEBEE',color:'#d32f2f',padding:'10px 12px',borderRadius:8,fontSize:13,marginTop:12}}>{error}</div>}
+        <button onClick={submit} disabled={busy||code.length<6} style={{...btnPri,width:'100%',padding:'12px',fontSize:15,marginTop:14,opacity:busy||code.length<6?0.6:1}}>{busy?'Проверка...':'Подтвердить'}</button>
+        <div onClick={onLogout} style={{textAlign:'center',marginTop:14,fontSize:13,color:'#888',cursor:'pointer'}}>Выйти</div>
+      </div>
+    </div>
+  );
+};
+
 const MfaEnroll=({onDone,onClose,forced,isMobile})=>{
   const [stage,setStage]=useState('loading');
   const [factor,setFactor]=useState(null);
@@ -2212,6 +2243,8 @@ function App(){
   const [year,setYear]=useState(new Date().getFullYear());
   const [hasMfa,setHasMfa]=useState(false);
   const [mfaChecked,setMfaChecked]=useState(false);
+  const [mfaFactor,setMfaFactor]=useState(null);
+  const [aal,setAal]=useState(null);
 
   // Auth
   useEffect(()=>{
@@ -2227,13 +2260,14 @@ function App(){
 
   // Check approval
   useEffect(()=>{
-    if(!user){setApproved(false);setHasMfa(false);setMfaChecked(false);return;}
+    if(!user){setApproved(false);setHasMfa(false);setMfaChecked(false);setMfaFactor(null);setAal(null);return;}
     (async()=>{
       let{data,error}=await sb.from('user_approvals').select('*').eq('user_id',user.id).single();
       if(error&&!data){await sb.auth.refreshSession();const retry=await sb.from('user_approvals').select('*').eq('user_id',user.id).single();data=retry.data;}
       setApproved(data?.approved===true);
       setIsAdmin(data?.is_admin===true);
-      try{const{data:fac}=await sb.auth.mfa.listFactors();setHasMfa(!!(fac&&fac.verified&&fac.verified.length>0));}catch(e){setHasMfa(false);}
+      try{const{data:fac}=await sb.auth.mfa.listFactors();const v=(fac&&fac.verified)||[];setHasMfa(v.length>0);setMfaFactor(v[0]||null);}catch(e){setHasMfa(false);setMfaFactor(null);}
+      setAal(sb.auth.mfa.level());
       setMfaChecked(true);
     })();
   },[user]);
@@ -2280,7 +2314,11 @@ function App(){
 
   if(!approved) return <ApprovalPending user={user} onLogout={logout}/>;
 
-  if(isAdmin && mfaChecked && !hasMfa) return <MfaEnroll forced={true} isMobile={isMobile} onDone={()=>setHasMfa(true)}/>;
+  if(!mfaChecked) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'linear-gradient(135deg, #3D5F94, #5680BF)'}}><div style={{color:'white',fontSize:16,display:'flex',alignItems:'center',gap:12}}><div style={{width:24,height:24,border:'2px solid rgba(255,255,255,0.4)',borderTopColor:'white',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/> Проверка…<style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div></div>;
+
+  if(hasMfa && aal!=='aal2') return <MfaChallenge factor={mfaFactor} isMobile={isMobile} onDone={()=>setAal('aal2')} onLogout={logout}/>;
+
+  if(!hasMfa && isAdmin) return <MfaEnroll forced={true} isMobile={isMobile} onDone={()=>{setHasMfa(true);setAal('aal2');}}/>;
 
   // МОБИЛЬНЫЙ layout
   if(isMobile){
